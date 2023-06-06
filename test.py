@@ -90,6 +90,16 @@ pred = bn.predict(ot_odr_df[["SIG_OBS"]].iloc[-1000:],
 
 print(pred)
 
+pred_prob_N2 = bn.predict_proba(ot_odr_df[["SYSTEM_N1"]].iloc[-1000:],
+                                var_target="SYSTEM_N2",
+                                show_progress=True)
+print(pred_prob_N2)
+
+pred_N2 = bn.predict(ot_odr_df[["SYSTEM_N1"]].iloc[-1000:],
+                        var_target="SYSTEM_N2",
+                        show_progress=True)
+print(pred_N2)
+
 
 ##################
 # Create web app #

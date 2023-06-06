@@ -17,9 +17,16 @@ Voici les procédures d'installation du SIDA sur votre machine.
 
 Pour démarrer le SIDA, il faut lancer le fichier `app.py`.
 
+## Données d'entrée :
+
+Notre application utilise en entrée un fichier csv qui regroupe un ensemble de données sur l'historique des anomalies détectées sur les véhicules de l'entreprise.
+Dans celui-ci, on y associe les remarques des techniciens de maintenance sur les anomalies détectées et les actions de maintenance effectuées.
+On y retrouve aussi d'autre information comme le kilométrage du véhicule et la ligne suivi par celui-ci.
+
 ## Fonctionnement
+
+On se base sur une approche probabiliste en utilisant les réseaux bayésiens.
 
 ## Modélisation
 
 ## Evaluation des performances
-
