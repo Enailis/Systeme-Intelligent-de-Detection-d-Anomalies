@@ -64,3 +64,19 @@ for var in var_bn.values():
 bn.addArc("SIG_OBS", "SYSTEM_N1")
 
 bn.fit(ot_odr_df)
+
+
+###############
+# Prédictions #
+###############
+
+pred_prob = bn.predict_proba(ot_odr_df[["SIG_OBS"]].iloc[-1000:], 
+                             var_target="SYSTEM_N1",
+                             show_progress=True)
+print(pred_prob)
+
+pred = bn.predict(ot_odr_df[["SIG_OBS"]].iloc[-1000:], 
+                  var_target="SYSTEM_N1",
+                  show_progress=True)
+
+print(pred)
