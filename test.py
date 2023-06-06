@@ -45,7 +45,7 @@ for var in var_cat:
 ot_odr_df.info()
 
 # Création d'un premier modèle
-var_to_model = ["SYSTEM_N1", "SIG_OBS"]
+var_to_model = ["SYSTEM_N1", "SYSTEM_N2", "SIG_OBS", "SIG_ORGANE", "SIG_CONTEXTE"]
 
 var_bn = {}
 for var in var_to_model:
@@ -61,7 +61,10 @@ bn = gum.BayesNet("modèle simple")
 for var in var_bn.values():
     bn.add(var)
 
-bn.addArc("SIG_OBS", "SYSTEM_N1")
+bn.addArc("SYSTEM_N2", "SYSTEM_N1")
+
+bn.addArc("SYSTEM_N1", "SIG_OBS")
+bn.addArc("SYSTEM_N1", "SIG_ORGANE")
 
 bn.fit(ot_odr_df)
 
