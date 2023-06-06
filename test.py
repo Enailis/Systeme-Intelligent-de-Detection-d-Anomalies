@@ -3,6 +3,8 @@ from pyagrum_extra import gum
 import pandas as pd
 import os
 
+import ipdb
+
 import dash
 from dash import html, dash_table
 from dash.dependencies import Input, Output
@@ -51,7 +53,8 @@ for var in var_cat:
 ot_odr_df.info()
 
 # Création d'un premier modèle
-var_to_model = ["SYSTEM_N1", "SYSTEM_N2", "SIG_OBS", "SIG_ORGANE", "SIG_CONTEXTE"]
+var_to_model = ["SYSTEM_N1", "SYSTEM_N2", "SIG_OBS", "SIG_ORGANE"]
+var_feature  = ["SIG_ORGANE", "SIG_OBS"]
 
 var_bn = {}
 for var in var_to_model:
@@ -82,13 +85,13 @@ bn.fit(ot_odr_df)
 pred_prob = bn.predict_proba(ot_odr_df[["SIG_OBS"]].iloc[-1000:], 
                              var_target="SYSTEM_N1",
                              show_progress=True)
-print(pred_prob)
+#print(pred_prob)
 
 pred = bn.predict(ot_odr_df[["SIG_OBS"]].iloc[-1000:], 
                   var_target="SYSTEM_N1",
                   show_progress=True)
 
-print(pred)
+#print(pred)
 
 pred_prob_N2 = bn.predict_proba(ot_odr_df[["SYSTEM_N1"]].iloc[-1000:],
                                 var_target="SYSTEM_N2",
@@ -105,8 +108,6 @@ print(pred_N2)
 # Create web app #
 ##################
 
-temp_table = ["SIG_ORGANE", "SIG_OBS"]
-
 app = dash.Dash("salut la team")
 
 app.layout = html.Div([
@@ -119,24 +120,48 @@ app.layout = html.Div([
                 options=[{'label': i, 'value': i} for i in ot_odr_df[var].cat.categories],
                 value=ot_odr_df[var].cat.categories[0]
             )
-        ], style={'width': '30%','display': 'inline-block'}) for var in temp_table
+        ], style={'width': '30%','display': 'inline-block'}) for var in var_feature
     ], style={'width': '100%', 'display': 'inline-block', 'text-align': 'center'}),
 
 
     html.Div([
-        html.H3("aaaaaaa", id = "test"),
-        dash_table.DataTable()
+        dash_table.DataTable(
+            id='N1_array',
+            columns=(
+                [{'id': 'modalité', 'name': 'Modalité'},
+                 {'id': 'proba', 'name': 'Probabilité'}]
+            ),
+            data=[],
+            editable=True
+        ),
     ])
 
 ])
 
 @app.callback(
-    [Output('test', 'value')],
-    [Input(f'{var}-dropdown', 'value') for var in temp_table]
+    [Output('N1_array', 'data')],
+    [Input(f'{var}-dropdown', 'value') for var in var_feature]
 )
-def test(*input):
-    print(input)
+def get_N1s(*input):
+    bn_ie = gum.LazyPropagation(bn)
+
+    ev = {var: value for var, value in zip(var_feature, input)}
+    bn_ie.setEvidence(ev)
+    bn_ie.makeInference()
+
+    var_targets = ["SYSTEM_N1"]
+
+    temp_array = None
+    for var in var_targets:
+        temp_array = bn_ie.posterior(var).topandas().droplevel(0).sort_values(ascending = False).head(5)
+
+    #ipdb.set_trace()
+    print(temp_array.index.tolist())
+    temp_array = temp_array.reset_index()
+
+    temp_array.columns = ["modalité", "proba"]
+
+    return [temp_array.to_dict('records')]
 
 
-
-app.run_server(debug=True)
+app.run_server(debug=True, port=8086)
