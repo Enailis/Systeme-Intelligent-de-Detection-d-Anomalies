@@ -234,11 +234,11 @@ gum.BayesNet.add_rul_var = add_rul_var
 # Fitting/Predict methods
 # =======================
 
-def fit_cpt(bn, df, var_name,
-            apriori_coef="smart",
-            apriori_dist="uniform",
-            apriori_data_threshold=30,
-            verbose_mode=False):
+def fit_cpt_bis(bn, df, var_name,
+                apriori_coef="smart",
+                apriori_dist="uniform",
+                apriori_data_threshold=30,
+                verbose_mode=False):
     """
     This function aims to compute the maximum likelihood estimation of CPT parameters from a Pandas
     dataframe.
@@ -265,10 +265,7 @@ def fit_cpt(bn, df, var_name,
     if verbose_mode:
         sys.stdout.write("- Learn CPT {0}\n".format(var_name))
 
-    domains = [bn.variable(vn).domainSize()
-               for vn in bn.cpt(var_name).var_names]
-
-    parents = list(bn.cpt(var_name).var_names)
+    parents = list(reversed(bn.cpt(var_name).names))
     parents.pop()
 
     # Check if df consists of catagorical variables only
@@ -280,11 +277,13 @@ def fit_cpt(bn, df, var_name,
 
     # Warning : df variables must be categorical here if not unobserved but possible configurations will be dropped
     # and then lead to unconsistent CPT
-    joint_counts = np.array(pd.crosstab(
-        df[var_name], [df[parent] for parent in parents], dropna=False), dtype=float)
+    if len(parents) == 0:
+        joint_counts = np.array(df[var_name].value_counts().loc[df[var_name].cat.categories], dtype=float)
+    else:   
+        joint_counts = np.array(pd.crosstab(
+            df[var_name], [df[parent] for parent in parents], dropna=False), dtype=float)
 
     cond_counts = joint_counts.sum(axis=0)
-
     # if cond_counts is monodimensionnal then cond_counts will be a float and not a Series
     # if type(cond_counts) == pd.core.series.Series:
     #     cond_counts = cond_counts.apply(np.float32)
@@ -311,8 +310,8 @@ def fit_cpt(bn, df, var_name,
                 else:
                     idx_cond_count_sup_0 = np.where(cond_counts > 0)
                     apriori_coef_arr = np.ones(cond_counts.shape)
-                    apriori_coef_arr[idx_cond_count_sup_0] = 1 / \
-                        cond_counts[idx_cond_count_sup_0]
+                    apriori_coef_arr[idx_cond_count_sup_0] = \
+                        1/cond_counts[idx_cond_count_sup_0]
             else:
                 err_msg = "apriori coef {0} is not supported. Possible values are : 'smart' or non negative value\n".format(
                     apriori_coef)
@@ -338,14 +337,59 @@ def fit_cpt(bn, df, var_name,
     # Normalization of counts to get a consistent CPT
     # Note: np.nan_to_num is used only in the case where no apriori is requested to force nan value to 0
     #       => this is of course highly unsafe to work in this situation as CPTs may not sum to 1 for all configurations
+    cpt_shape = bn.cpt(var_name)[:].shape
     bn.cpt(var_name)[:] = np.nan_to_num(
-        (joint_counts/cond_counts).transpose().reshape(*domains))
+        (joint_counts/cond_counts).transpose().reshape(cpt_shape))
+
+
+def fit_cpt(bn, df, var_name, verbose_mode=False):
+    """
+    This function aims to compute the maximum likelihood estimation of CPT parameters from a Pandas
+    dataframe.
+
+    Parameters
+    - =df=: a Pandas DataFrame consisting only of categorical variables.
+    - =var_name=: the variable name associated to the CPT to be fitted.
+    """
+    if verbose_mode:
+        sys.stdout.write("- Learn CPT {0}\n".format(var_name))
+
+    parents = list(reversed(bn.cpt(var_name).names))
+    parents.pop()
+
+    # Check if df consists of catagorical variables only
+    for data_s in df[[var_name] + parents].columns:
+        if str(df[data_s].dtype) != "category":
+            err_msg = "Variable {0} is not categorical : type {1}\n".format(
+                data_s, str(df[data_s].dtype))
+            raise TypeError(err_msg)
+
+    # Warning : df variables must be categorical here if not unobserved but possible configurations will be dropped
+    # and then lead to unconsistent CPT
+
+    if len(parents) == 0:
+        cpt_df = df[var_name].value_counts(normalize=True)\
+                                   .loc[df[var_name].cat.categories].astype(float)
+        bn.cpt(var_name)[:] = cpt_df.values[:]
+    else:
+        joint_counts = pd.crosstab(
+            df[var_name], [df[parent] for parent in parents], dropna=False).astype(float)
+
+        cond_counts = joint_counts.sum(axis=0)
+
+        cpt_df = (joint_counts/cond_counts).fillna(1/joint_counts.shape[0])
+
+        #ipdb.set_trace()
+        bn_cpt_shape = bn.cpt(var_name)[:].shape
+        bn.cpt(var_name)[:] = \
+            cpt_df.values[:].transpose()\
+                            .reshape(bn_cpt_shape)
 
 
 gum.BayesNet.fit_cpt = fit_cpt
+gum.BayesNet.fit_cpt_bis = fit_cpt_bis
 
-
-def fit(bn, df,
+def fit_bis(bn, df,
         apriori_coef="smart",
         apriori_dist="uniform",
         apriori_data_threshold=30,
@@ -359,14 +403,29 @@ def fit(bn, df,
                           disable=not(progress_mode),
                           desc="CPT fitting"):
         if not(name in exclude_variables):
-            bn.fit_cpt(df, name,
+            bn.fit_cpt_bis(df, name,
                        apriori_coef=apriori_coef,
                        apriori_dist=apriori_dist,
                        apriori_data_threshold=apriori_data_threshold,
                        verbose_mode=verbose_mode)
 
+def fit(bn, df,
+        exclude_variables=[],
+        verbose_mode=False,
+        progress_mode=False):
+    """
+    Fit the CPTs of every variable in the BN bn from the database df.
+    """
+    for name in tqdm.tqdm(bn.names(),
+                          disable=not(progress_mode),
+                          desc="CPT fitting"):
+        if not(name in exclude_variables):
+            bn.fit_cpt(df, name,
+                       verbose_mode=verbose_mode)
+
 
 gum.BayesNet.fit = fit
+gum.BayesNet.fit_bis = fit_bis
 
 
 def predict(bn, data, var_target, returns="map", show_progress=False, debug=False):
@@ -397,7 +456,7 @@ def predict(bn, data, var_target, returns="map", show_progress=False, debug=Fals
     target_size = bn.variable(var_target).domainSize()
     target_dom = np.array([bn.variable(var_target).label(i)
                            for i in range(target_size)])
-    data_records = data.to_dict("record")
+    data_records = data.to_dict("records")
     post_prob = np.zeros((nb_data, target_size))
     for i in range(nb_data):
         if debug:
