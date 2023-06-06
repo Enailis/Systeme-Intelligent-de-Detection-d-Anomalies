@@ -3,6 +3,12 @@ from pyagrum_extra import gum
 import pandas as pd
 import os
 
+import dash
+from dash import html, dash_table
+from dash.dependencies import Input, Output
+from dash import dcc
+import plotly.express as px
+
 
 ###########################################
 # Chargement et brève analyse descriptive #
@@ -83,3 +89,44 @@ pred = bn.predict(ot_odr_df[["SIG_OBS"]].iloc[-1000:],
                   show_progress=True)
 
 print(pred)
+
+
+##################
+# Create web app #
+##################
+
+temp_table = ["SIG_ORGANE", "SIG_OBS"]
+
+app = dash.Dash("salut la team")
+
+app.layout = html.Div([
+    html.H1("Système Intelligent de Détection d'Anomalies", style={'textAlign': 'center'}),
+    html.Div([
+        html.Div([
+            html.H3(f'{var}'),
+            dcc.Dropdown(
+                id=f'{var}-dropdown',
+                options=[{'label': i, 'value': i} for i in ot_odr_df[var].cat.categories],
+                value=ot_odr_df[var].cat.categories[0]
+            )
+        ], style={'width': '30%','display': 'inline-block'}) for var in temp_table
+    ], style={'width': '100%', 'display': 'inline-block', 'text-align': 'center'}),
+
+
+    html.Div([
+        html.H3("aaaaaaa", id = "test"),
+        dash_table.DataTable()
+    ])
+
+])
+
+@app.callback(
+    [Output('test', 'value')],
+    [Input(f'{var}-dropdown', 'value') for var in temp_table]
+)
+def test(*input):
+    print(input)
+
+
+
+app.run_server(debug=True)
