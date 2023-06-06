@@ -1,32 +1,50 @@
+from pyagrum_extra import gum
+
 import pandas as pd
 import os
 
-import pyAgrum.skbn as skbn
-import pyAgrum as gum
 
-ot_odr_filename = os.path.join(".", "data", "OT_ODR.csv.bz2")
+###########################################
+# Chargement et brève analyse descriptive #
+###########################################
+
+ot_odr_filename = os.path.join("./data", "OT_ODR.csv.bz2")
 ot_odr_df = pd.read_csv(ot_odr_filename,
                         compression="bz2",
                         sep=";")
 
-equipements_filename = os.path.join(".", "data", 'EQUIPEMENTS.csv')
+equipements_filename = os.path.join("./data", 'EQUIPEMENTS.csv')
 equipements_df = pd.read_csv(equipements_filename,
                              sep=";")
 
+# Analyse des modalités des variables de signalement
 var_sig = ["SIG_ORGANE", "SIG_CONTEXTE", "SIG_OBS"]
-print(ot_odr_df[var_sig].describe())
+ot_odr_df[var_sig].describe()
 
 
-# prepare variables
+# Analyse des modalités des variables systèmes
+var_sys = ["SYSTEM_N1", "SYSTEM_N2", "SYSTEM_N3"]
+ot_odr_df[var_sys].describe()
 
-var_cat = ["SIG_OBS", "SYSTEM_N1"]
 
-for i in var_cat:
-    ot_odr_df[i] = ot_odr_df[i].astype("category")
+# Analyse des modalités des variables type travail et OdR
+var_odr = ["TYPE_TRAVAIL", "ODR_LIBELLE"]
+ot_odr_df[var_odr].describe()
+
+
+###########################
+# Préparation des données #
+###########################
+
+var_cat = ['ODR_LIBELLE', 'TYPE_TRAVAIL',
+           'SYSTEM_N1', 'SYSTEM_N2', 'SYSTEM_N3', 
+           'SIG_ORGANE', 'SIG_CONTEXTE', 'SIG_OBS', 'LIGNE']
+for var in var_cat:
+    ot_odr_df[var] = ot_odr_df[var].astype('category')
 
 ot_odr_df.info()
 
-bn = gum.BayesNet("vroum vroum")
+# Création d'un premier modèle
 var_to_model = ["SYSTEM_N1", "SIG_OBS"]
 
 var_bn = {}
@@ -38,22 +56,11 @@ for var in var_bn:
     for i, modalite in enumerate(ot_odr_df[var].cat.categories):
         var_bn[var].changeLabel(i, modalite)
 
-bn = gum.BayesNet("vroum vroum")
+bn = gum.BayesNet("modèle simple")
 
-for var in var_bn:
+for var in var_bn.values():
     bn.add(var)
 
 bn.addArc("SIG_OBS", "SYSTEM_N1")
 
-print(bn)
-
-# bn = gum.BayesNet("vroum vroum")
-
-# sig_organe = gum.LabelizedVariable("SIG_ORGANE", "Signalement du conduction sur la partie organe", ot_odr_df['SIG_ORGANE'].unique())
-# system_n1= gum.LabelizedVariable("SYSTEM_N1", "Identifiant de système de niveau 1 concerné par l'ODR (niveau macroscopique)", ot_odr_df['SYSTEM_N1'].unique())
-# for va in [sig_organe, system_n1]:
-#     bn.add(va)
-
-# bn.addArc("SIG_ORGANE", "SYSTEM_N1")
-
-# print(bn)
+bn.fit(ot_odr_df)
