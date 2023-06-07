@@ -87,24 +87,18 @@ bn.fit(ot_odr_df)
 pred_prob = bn.predict_proba(ot_odr_df[["SIG_OBS"]].iloc[-1000:], 
                              var_target="SYSTEM_N1",
                              show_progress=True)
-#print(pred_prob)
 
 pred = bn.predict(ot_odr_df[["SIG_OBS"]].iloc[-1000:], 
                   var_target="SYSTEM_N1",
                   show_progress=True)
 
-#print(pred)
-
 pred_prob_N2 = bn.predict_proba(ot_odr_df[["SYSTEM_N1"]].iloc[-1000:],
                                 var_target="SYSTEM_N2",
                                 show_progress=True)
-print(pred_prob_N2)
 
 pred_N2 = bn.predict(ot_odr_df[["SYSTEM_N1"]].iloc[-1000:],
                         var_target="SYSTEM_N2",
                         show_progress=True)
-print(pred_N2)
-
 
 ##################
 # Create web app #
@@ -129,32 +123,30 @@ app.layout = html.Div([
     ], style={'width': '100%', 'display': 'inline-block', 'text-align': 'center'}),
 
     html.Div([
-        html.Div([
-            dash_table.DataTable(
-                id='N1_array',
-                columns=(
-                    [{'id': 'modalité', 'name': 'Modalité'},
-                    {'id': 'proba', 'name': 'Probabilité'}]
-                ),
-                data=[],
-                editable=True,
-                style_cell={'textAlign': 'center'},
-                style_cell_conditional=[
-                    {
-                        'if': {'column_id': 'modalité'},
-                        'textAlign': 'left'
-                    }
-                ],
-                active_cell=initial_active_cell
+        dash_table.DataTable(
+            id='N1_array',
+            columns=(
+                [{'id': 'modalité', 'name': 'Modalité'},
+                {'id': 'proba', 'name': 'Probabilité'}]
             ),
-        ], style={'width': '40%', 'display': 'inline-block'})
-    ], style={'text-align': 'center'}),
+            data=[],
+            editable=True,
+            style_cell={'textAlign': 'center'},
+            style_cell_conditional=[
+                {
+                    'if': {'column_id': 'modalité'},
+                    'textAlign': 'left'
+                }
+            ],
+            active_cell=initial_active_cell
+        ),
+    ], style={'width': '40%', 'display': 'inline-block'}),
 
     html.Div([
         dcc.Graph(id='graph')
         ], style={'width': '75%', 'display': 'inline-block'}
     )
-])
+], style={'text-align': 'center'})
 
 @app.callback(
     [Output('N1_array', 'data')],
@@ -174,8 +166,6 @@ def get_N1s(*input):
     for var in var_targets:
         temp_array = bn_ie.posterior(var).topandas().droplevel(0).sort_values(ascending = False).head(5)
 
-    #ipdb.set_trace()
-    print(temp_array.index.tolist())
     top_5 = temp_array.index.tolist()
     temp_array = temp_array.reset_index()
 
@@ -203,8 +193,6 @@ def update_graphs(active_cell):
         prob_target_var = prob_target_var[prob_target_var != 0]
         prob_fig = px.bar(prob_target_var)
         prob_target.append(prob_fig)
-
-        #print(prob_target)
 
         return tuple(prob_target)
 
