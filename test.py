@@ -109,6 +109,7 @@ print(pred_N2)
 ##################
 
 top_5 = []
+initial_active_cell = {"row": 0, "column": 0, "column_id": "modalité", "row_id": 0}
 
 app = dash.Dash("salut la team")
 
@@ -141,14 +142,15 @@ app.layout = html.Div([
                         'if': {'column_id': 'modalité'},
                         'textAlign': 'left'
                     }
-                ]
+                ],
+                active_cell=initial_active_cell
             ),
         ], style={'width': '40%', 'display': 'inline-block'})
     ], style={'text-align': 'center'}),
 
     html.Div([
         dcc.Graph(id='graph')
-        ], style={'width': '65%', 'float': 'right', 'display': 'inline-block'}
+        ], style={'width': '75%', 'display': 'inline-block'}
     )
 ])
 
@@ -186,19 +188,19 @@ def get_N1s(*input):
 )
 def update_graphs(active_cell):
     global top_5
-    print(top_5[active_cell['row']])
+    if active_cell != None:
+        bn_ie = gum.LazyPropagation(bn)
 
-    bn_ie = gum.LazyPropagation(bn)
+        ev = {}
+        ev["SYSTEM_N1"] = top_5[active_cell['row']]
+        bn_ie.setEvidence(ev)
+        bn_ie.makeInference()
 
-    ev = {var: value for var, value in zip("SYSTEM_N1", top_5[active_cell['row']])}
-    bn_ie.setEvidence(ev)
-    bn_ie.makeInference()
-
-    prob_target = []
-    prob_target_var = bn_ie.posterior("SYSTEM_N2").topandas().droplevel(0)
-    prob_fig = px.bar(prob_target_var)
-    prob_target.append(prob_fig)
-    
-    return tuple(prob_target)
+        prob_target = []
+        prob_target_var = bn_ie.posterior("SYSTEM_N2").topandas().droplevel(0)
+        prob_fig = px.bar(prob_target_var)
+        prob_target.append(prob_fig)
+        
+        return tuple(prob_target)
 
 app.run_server(debug=True, port=8086)
