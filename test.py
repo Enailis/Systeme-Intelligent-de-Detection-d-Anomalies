@@ -11,6 +11,8 @@ from dash.dependencies import Input, Output
 from dash import dcc
 import plotly.express as px
 
+import plotly.graph_objects as go
+
 
 ###########################################
 # Chargement et brève analyse descriptive #
@@ -197,10 +199,13 @@ def update_graphs(active_cell):
         bn_ie.makeInference()
 
         prob_target = []
-        prob_target_var = bn_ie.posterior("SYSTEM_N2").topandas().droplevel(0)
+        prob_target_var = bn_ie.posterior("SYSTEM_N2").topandas().droplevel(0).sort_values(ascending = False)
+        prob_target_var = prob_target_var[prob_target_var != 0]
         prob_fig = px.bar(prob_target_var)
         prob_target.append(prob_fig)
-        
+
+        #print(prob_target)
+
         return tuple(prob_target)
 
 app.run_server(debug=True, port=8086)
