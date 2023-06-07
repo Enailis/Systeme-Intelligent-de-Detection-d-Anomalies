@@ -108,6 +108,8 @@ print(pred_N2)
 # Create web app #
 ##################
 
+top_5 = []
+
 app = dash.Dash("salut la team")
 
 app.layout = html.Div([
@@ -123,19 +125,31 @@ app.layout = html.Div([
         ], style={'width': '30%','display': 'inline-block'}) for var in var_feature
     ], style={'width': '100%', 'display': 'inline-block', 'text-align': 'center'}),
 
+    html.Div([
+        html.Div([
+            dash_table.DataTable(
+                id='N1_array',
+                columns=(
+                    [{'id': 'modalité', 'name': 'Modalité'},
+                    {'id': 'proba', 'name': 'Probabilité'}]
+                ),
+                data=[],
+                editable=True,
+                style_cell={'textAlign': 'center'},
+                style_cell_conditional=[
+                    {
+                        'if': {'column_id': 'modalité'},
+                        'textAlign': 'left'
+                    }
+                ]
+            ),
+        ], style={'width': '40%', 'display': 'inline-block'})
+    ], style={'text-align': 'center'}),
 
     html.Div([
-        dash_table.DataTable(
-            id='N1_array',
-            columns=(
-                [{'id': 'modalité', 'name': 'Modalité'},
-                 {'id': 'proba', 'name': 'Probabilité'}]
-            ),
-            data=[],
-            editable=True
-        ),
-    ])
-
+        dcc.Graph(id='graph')
+        ], style={'width': '65%', 'float': 'right', 'display': 'inline-block'}
+    )
 ])
 
 @app.callback(
@@ -143,6 +157,7 @@ app.layout = html.Div([
     [Input(f'{var}-dropdown', 'value') for var in var_feature]
 )
 def get_N1s(*input):
+    global top_5
     bn_ie = gum.LazyPropagation(bn)
 
     ev = {var: value for var, value in zip(var_feature, input)}
@@ -157,11 +172,33 @@ def get_N1s(*input):
 
     #ipdb.set_trace()
     print(temp_array.index.tolist())
+    top_5 = temp_array.index.tolist()
     temp_array = temp_array.reset_index()
 
     temp_array.columns = ["modalité", "proba"]
 
     return [temp_array.to_dict('records')]
 
+
+@app.callback(
+    [Output('graph', 'figure')],
+    [Input('N1_array', 'active_cell')]
+)
+def update_graphs(active_cell):
+    global top_5
+    print(top_5[active_cell['row']])
+
+    bn_ie = gum.LazyPropagation(bn)
+
+    ev = {var: value for var, value in zip("SYSTEM_N1", top_5[active_cell['row']])}
+    bn_ie.setEvidence(ev)
+    bn_ie.makeInference()
+
+    prob_target = []
+    prob_target_var = bn_ie.posterior("SYSTEM_N2").topandas().droplevel(0)
+    prob_fig = px.bar(prob_target_var)
+    prob_target.append(prob_fig)
+    
+    return tuple(prob_target)
 
 app.run_server(debug=True, port=8086)
