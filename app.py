@@ -3,26 +3,23 @@ from pyagrum_extra import gum
 import pandas as pd
 import os
 
-import ipdb
-
 import dash
 from dash import html, dash_table
 from dash.dependencies import Input, Output
 from dash import dcc
 import plotly.express as px
 
-import plotly.graph_objects as go
-
-
 ###########################################
 # Chargement et brève analyse descriptive #
 ###########################################
 
+# Chargement des données
 ot_odr_filename = os.path.join("./data", "OT_ODR.csv.bz2")
 ot_odr_df = pd.read_csv(ot_odr_filename,
                         compression="bz2",
                         sep=";")
 
+# Chargement des données d'équipements
 equipements_filename = os.path.join("./data", 'EQUIPEMENTS.csv')
 equipements_df = pd.read_csv(equipements_filename,
                              sep=";")
@@ -31,23 +28,21 @@ equipements_df = pd.read_csv(equipements_filename,
 var_sig = ["SIG_ORGANE", "SIG_CONTEXTE", "SIG_OBS"]
 ot_odr_df[var_sig].describe()
 
-
 # Analyse des modalités des variables systèmes
 var_sys = ["SYSTEM_N1", "SYSTEM_N2", "SYSTEM_N3"]
 ot_odr_df[var_sys].describe()
-
 
 # Analyse des modalités des variables type travail et OdR
 var_odr = ["TYPE_TRAVAIL", "ODR_LIBELLE"]
 ot_odr_df[var_odr].describe()
 
-
 ###########################
 # Préparation des données #
 ###########################
 
+# On ne garde que les variables qui nous intéressent
 var_cat = ['ODR_LIBELLE', 'TYPE_TRAVAIL',
-           'SYSTEM_N1', 'SYSTEM_N2', 'SYSTEM_N3', 
+           'SYSTEM_N1', 'SYSTEM_N2', 'SYSTEM_N3',
            'SIG_ORGANE', 'SIG_CONTEXTE', 'SIG_OBS', 'LIGNE']
 for var in var_cat:
     ot_odr_df[var] = ot_odr_df[var].astype('category')
@@ -56,7 +51,7 @@ ot_odr_df.info()
 
 # Création d'un premier modèle
 var_to_model = ["SYSTEM_N1", "SYSTEM_N2", "SIG_OBS", "SIG_ORGANE"]
-var_feature  = ["SIG_ORGANE", "SIG_OBS"]
+var_feature = ["SIG_ORGANE", "SIG_OBS"]
 
 var_bn = {}
 for var in var_to_model:
@@ -67,11 +62,14 @@ for var in var_bn:
     for i, modalite in enumerate(ot_odr_df[var].cat.categories):
         var_bn[var].changeLabel(i, modalite)
 
+# Création du réseau bayésien
 bn = gum.BayesNet("modèle simple")
 
+# Ajout des noeuds
 for var in var_bn.values():
     bn.add(var)
 
+# Ajout des arcs
 bn.addArc("SYSTEM_N2", "SYSTEM_N1")
 
 bn.addArc("SYSTEM_N1", "SIG_OBS")
@@ -79,26 +77,29 @@ bn.addArc("SYSTEM_N1", "SIG_ORGANE")
 
 bn.fit(ot_odr_df)
 
-
 ###############
 # Prédictions #
 ###############
 
-pred_prob = bn.predict_proba(ot_odr_df[["SIG_OBS"]].iloc[-1000:], 
+pred_prob = bn.predict_proba(ot_odr_df[["SIG_OBS"]].iloc[-1000:],
                              var_target="SYSTEM_N1",
                              show_progress=True)
 
-pred = bn.predict(ot_odr_df[["SIG_OBS"]].iloc[-1000:], 
+pred = bn.predict(ot_odr_df[["SIG_OBS"]].iloc[-1000:],
                   var_target="SYSTEM_N1",
                   show_progress=True)
+
+print("System_N1 prediction : " + (ot_odr_df["SYSTEM_N1"].iloc[-1000:] == pred).mean())
 
 pred_prob_N2 = bn.predict_proba(ot_odr_df[["SYSTEM_N1"]].iloc[-1000:],
                                 var_target="SYSTEM_N2",
                                 show_progress=True)
 
 pred_N2 = bn.predict(ot_odr_df[["SYSTEM_N1"]].iloc[-1000:],
-                        var_target="SYSTEM_N2",
-                        show_progress=True)
+                     var_target="SYSTEM_N2",
+                     show_progress=True)
+
+print("System_N2 prediction : " + (ot_odr_df["SYSTEM_N2"].iloc[-1000:] == pred_N2).mean())
 
 ##################
 # Create web app #
@@ -119,7 +120,7 @@ app.layout = html.Div([
                 options=[{'label': i, 'value': i} for i in ot_odr_df[var].cat.categories],
                 value=ot_odr_df[var].cat.categories[0]
             )
-        ], style={'width': '30%','display': 'inline-block'}) for var in var_feature
+        ], style={'width': '30%', 'display': 'inline-block'}) for var in var_feature
     ], style={'width': '100%', 'display': 'inline-block', 'text-align': 'center'}),
 
     html.Div([
@@ -127,7 +128,7 @@ app.layout = html.Div([
             id='N1_array',
             columns=(
                 [{'id': 'modalité', 'name': 'Modalité'},
-                {'id': 'proba', 'name': 'Probabilité'}]
+                 {'id': 'proba', 'name': 'Probabilité'}]
             ),
             data=[],
             editable=True,
@@ -144,9 +145,10 @@ app.layout = html.Div([
 
     html.Div([
         dcc.Graph(id='graph')
-        ], style={'width': '75%', 'display': 'inline-block'}
+    ], style={'width': '75%', 'display': 'inline-block'}
     )
 ], style={'text-align': 'center'})
+
 
 @app.callback(
     [Output('N1_array', 'data')],
@@ -164,7 +166,7 @@ def get_N1s(*input):
 
     temp_array = None
     for var in var_targets:
-        temp_array = bn_ie.posterior(var).topandas().droplevel(0).sort_values(ascending = False).head(5)
+        temp_array = bn_ie.posterior(var).topandas().droplevel(0).sort_values(ascending=False).head(5)
 
     top_5 = temp_array.index.tolist()
     temp_array = temp_array.reset_index()
@@ -189,11 +191,12 @@ def update_graphs(active_cell):
         bn_ie.makeInference()
 
         prob_target = []
-        prob_target_var = bn_ie.posterior("SYSTEM_N2").topandas().droplevel(0).sort_values(ascending = False)
+        prob_target_var = bn_ie.posterior("SYSTEM_N2").topandas().droplevel(0).sort_values(ascending=False)
         prob_target_var = prob_target_var[prob_target_var != 0]
         prob_fig = px.bar(prob_target_var)
         prob_target.append(prob_fig)
 
         return tuple(prob_target)
+
 
 app.run_server(debug=True, port=8086)

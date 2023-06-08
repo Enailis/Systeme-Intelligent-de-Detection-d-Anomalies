@@ -1,4 +1,6 @@
 pandas>=2.0.2
 pyagrum>=1.8.0
 numpy>=1.23.5
-tqdm>=4.65
+dash~=2.10.2
+plotly~=5.14.1
+tqdm~=4.65.0
